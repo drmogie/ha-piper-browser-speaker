@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.media_player import (
+    ATTR_MEDIA_ANNOUNCE,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
@@ -52,6 +53,7 @@ class PiperBrowserSpeaker(MediaPlayerEntity):
         | MediaPlayerEntityFeature.STOP
         | MediaPlayerEntityFeature.VOLUME_SET
         | MediaPlayerEntityFeature.VOLUME_MUTE
+        | MediaPlayerEntityFeature.MEDIA_ANNOUNCE
     )
 
     def __init__(self, entry: ConfigEntry) -> None:
@@ -109,9 +111,17 @@ class PiperBrowserSpeaker(MediaPlayerEntity):
         async_dispatcher_send(self.hass, SIGNAL_COMMAND.format(self.entity_id), command)
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs) -> None:
-        """Send a URL to the browser card to play."""
+        """Send a URL to the browser card to play.
+
+        Used both for plain playback and for TTS/announcements - a TTS
+        engine's tts.speak action (or an Assist pipeline response) ends up
+        calling this same method with the generated audio URL. When called
+        with announce=True, tell the card to duck-and-resume instead of
+        replacing whatever is currently playing.
+        """
+        command_type = "announce" if kwargs.get(ATTR_MEDIA_ANNOUNCE) else "play_media"
         self._send_command(
-            {"type": "play_media", "media_id": media_id, "media_type": media_type}
+            {"type": command_type, "media_id": media_id, "media_type": media_type}
         )
 
     async def async_media_play(self) -> None:

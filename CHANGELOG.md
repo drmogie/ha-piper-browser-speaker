@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026.09.14.4
+- Added TTS / announcement support. The entity now declares `MediaPlayerEntityFeature.MEDIA_ANNOUNCE`, so `tts.speak` and Assist pipeline responses (or a plain `media_player.play_media` call with `announce: true`) work against this speaker.
+- Announcements play on their own audio channel in the card - the main track (if playing) is paused, the announcement plays, and the main track automatically resumes where it left off afterward. Announcements always play at full volume regardless of the main track's volume/mute, so they stay audible.
+- No config changes needed - existing speakers pick this up automatically after updating.
+
 ## 2026.09.14.3
 - Fixed the card editor throwing "Cannot read properties of undefined (reading 'entity')" and greying out "Show visual editor". Home Assistant doesn't guarantee it calls the editor's `setConfig()` before assigning `.hass` - when `.hass` came first, `_config` was still undefined and the editor's render crashed. It now defaults `_config` to `{}` regardless of which comes first. (The card and integration were already working correctly through this - only the visual editor toggle was affected.)
 

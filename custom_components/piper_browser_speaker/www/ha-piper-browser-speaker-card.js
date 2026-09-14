@@ -139,6 +139,22 @@
         case "set_mute":
           this._audio.muted = msg.muted;
           break;
+        case "announce": {
+          // Duck-and-resume: pause whatever's playing, play the
+          // announcement on a separate audio channel, then resume where
+          // the main track left off. The main <audio>'s own play/pause
+          // events already report state, so no extra reporting needed here.
+          const wasPlaying = !this._audio.paused && !this._audio.ended;
+          if (wasPlaying) this._audio.pause();
+          this._announceAudio.src = msg.media_id;
+          this._announceAudio
+            .play()
+            .catch((err) => console.error("Piper Browser Speaker: announce failed", err));
+          this._announceAudio.onended = () => {
+            if (wasPlaying) this._audio.play().catch(() => {});
+          };
+          break;
+        }
         default:
           break;
       }
@@ -191,6 +207,11 @@
         </ha-card>
       `;
       this._audio = shadow.getElementById("audio");
+      // Announcements play on their own audio channel (not in the DOM - a
+      // plain Audio() object plays fine detached) so they never touch the
+      // main track's src/position, and they're always audible regardless
+      // of the main track's own volume/mute.
+      this._announceAudio = new Audio();
       this._audio.addEventListener("play", () => this._reportState({ state: "playing" }));
       this._audio.addEventListener("pause", () => {
         if (!this._audio.ended) this._reportState({ state: "paused" });

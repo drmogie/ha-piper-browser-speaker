@@ -1,6 +1,6 @@
 # Piper Browser Speaker
 
-Turns a web browser tab into a Home Assistant `media_player` speaker. Install the integration, name a speaker, then drop the companion card onto a dashboard view left open in the browser you want to use — that tab becomes a real `media_player` entity you can target with `media_player.play_media`, volume/mute, and (soon) TTS announcements.
+Turns a web browser tab into a Home Assistant `media_player` speaker. Install the integration, name a speaker, then drop the companion card onto a dashboard view left open in the browser you want to use — that tab becomes a real `media_player` entity you can target with `media_player.play_media`, volume/mute, and TTS announcements.
 
 ## How it works
 
@@ -35,14 +35,15 @@ Repeat steps 1–4 for each additional browser/device you want to turn into a sp
 - **Card doesn't appear at all / "Custom element doesn't exist":** the card's script only gets registered once the integration has at least one speaker configured, and your browser only re-checks that list on page load. Add an integration entry first, then hard-refresh the dashboard tab (Ctrl+Shift+R).
 - **Card shows but you can't pick an entity / editor won't load:** update to `2026.09.14.2` or later — earlier builds had a bug where the card errored out before the entity picker could render if no entity was selected yet.
 
-## Current support (MVP)
+## Current support
 
 - `media_player.play_media` (URL playback)
 - Play / pause / stop
 - Volume set / mute
 - Live connected/disconnected availability
+- TTS / announcements (`tts.speak`, Assist pipeline responses, or `media_player.play_media` with `announce: true`) — ducks whatever's playing, plays the announcement, then resumes where it left off, always at full volume regardless of the main track's volume/mute
 
-Not yet supported: TTS / `media_player.play_media` announcements, media browsing, queueing. Planned as a follow-up.
+Not yet supported: media browsing, queueing. Planned as a possible future addition.
 
 ## License
 
