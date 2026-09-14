@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.09.14.5
+- Fixed announcements never resuming the main track afterward. The card's `connectedCallback()` used a different (and async-unsafe) guard than the rest of the subscribe logic, so a dashboard reflow (e.g. Lovelace Sections reparenting the card) could open a second, independent subscription to the same entity while the first was still connecting. Every command from the backend then arrived twice - the second, spurious delivery of an `announce` command always computed "nothing was playing," overwriting the real resume handler with a no-op. `connectedCallback()` now uses the same synchronous guard as the rest of the card, and a stale in-flight subscription (from a reconnect that happens before the previous one finishes) now closes itself instead of staying live.
+- No config changes needed - existing speakers pick this up automatically after updating.
+
 ## 2026.09.14.4
 - Added TTS / announcement support. The entity now declares `MediaPlayerEntityFeature.MEDIA_ANNOUNCE`, so `tts.speak` and Assist pipeline responses (or a plain `media_player.play_media` call with `announce: true`) work against this speaker.
 - Announcements play on their own audio channel in the card - the main track (if playing) is paused, the announcement plays, and the main track automatically resumes where it left off afterward. Announcements always play at full volume regardless of the main track's volume/mute, so they stay audible.

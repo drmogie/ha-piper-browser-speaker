@@ -54,7 +54,16 @@
     }
 
     connectedCallback() {
-      if (this._hass && this._config && this._config.entity && !this._unsub) {
+      // Guard on the same synchronous marker _updateFromConfig() uses
+      // (_subscribedEntity, set at the very start of _subscribe()) rather
+      // than on _unsub, which isn't set until the subscribeMessage promise
+      // resolves. Dashboards that reparent elements (e.g. Lovelace
+      // Sections) can call connectedCallback again while an earlier
+      // _subscribe() call is still in flight; guarding on _unsub let a
+      // second, independent subscription slip through, so every command
+      // from the backend arrived twice.
+      const entityId = this._config && this._config.entity;
+      if (this._hass && entityId && entityId !== this._subscribedEntity) {
         this._subscribe();
       }
     }
@@ -64,6 +73,10 @@
     }
 
     _teardown() {
+      // Bump the generation so an in-flight _subscribe() call that resolves
+      // later (its subscribeMessage promise) recognizes it's stale and
+      // closes itself instead of becoming a second live subscription.
+      this._subscribeGeneration = (this._subscribeGeneration || 0) + 1;
       if (this._unsub) {
         this._unsub();
         this._unsub = null;
@@ -93,11 +106,23 @@
       if (!this._hass || !entityId) return;
 
       this._subscribedEntity = entityId;
+      this._subscribeGeneration = (this._subscribeGeneration || 0) + 1;
+      const generation = this._subscribeGeneration;
       try {
-        this._unsub = await this._hass.connection.subscribeMessage(
+        const unsub = await this._hass.connection.subscribeMessage(
           (msg) => this._handleCommand(msg),
           { type: WS_SUBSCRIBE, entity_id: entityId }
         );
+        if (generation !== this._subscribeGeneration) {
+          // A newer _subscribe()/_teardown() ran while this call was
+          // awaiting subscribeMessage - this subscription is stale (its
+          // entity may have changed, or the card was torn down and
+          // reconnected). Close it immediately rather than let it become a
+          // second live subscription delivering every command twice.
+          unsub();
+          return;
+        }
+        this._unsub = unsub;
         this._setStatus("connected");
         // Announce our starting state so the entity leaves "unavailable".
         this._reportState({
