@@ -7,7 +7,7 @@ PLATFORMS = [Platform.MEDIA_PLAYER]
 
 CARD_FILENAME = "ha-piper-browser-speaker-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_FILENAME}"
-CARD_VERSION = "2026.09.14.7"
+CARD_VERSION = "2026.09.14.8"
 
 SIGNAL_COMMAND = f"{DOMAIN}_command_{{}}"
 SIGNAL_STATE = f"{DOMAIN}_state_{{}}"

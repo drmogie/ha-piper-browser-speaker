@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026.09.14.8
+- Fixed the integration icon being unreadable in the integrations list. The full speaker-grille logo is great at full size but reads as a plain dark circle at the 40px icon size Home Assistant actually uses - `icon.png`/`icon@2x.png` are now a tighter crop of just the blue Home Assistant badge mark, which stays recognizable at small sizes. `logo.png`/`logo@2x.png` are unchanged (the full grille image, used in larger contexts like the integration's detail page).
+
 ## 2026.09.14.7
 - Added the integration's logo/icon (`custom_components/piper_browser_speaker/brand/`), served locally via Home Assistant 2026.3's custom-integration `brand/` folder support - shows up automatically on the integration entry, no submission to the home-assistant/brands repo needed.
 
