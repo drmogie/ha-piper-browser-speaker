@@ -34,6 +34,7 @@ Repeat steps 1–4 for each additional browser/device you want to turn into a sp
 
 - **Card doesn't appear at all / "Custom element doesn't exist":** the card's script only gets registered once the integration has at least one speaker configured, and your browser only re-checks that list on page load. Add an integration entry first, then hard-refresh the dashboard tab (Ctrl+Shift+R).
 - **Card shows but you can't pick an entity / editor won't load:** update to `2026.09.14.2` or later — earlier builds had a bug where the card errored out before the entity picker could render if no entity was selected yet.
+- **Nothing plays, and the card shows a yellow "Browser blocked audio - tap to enable" banner:** browsers refuse to play audio a script triggers (which is every command sent from Home Assistant) until the page has had a direct tap/click. This is expected the first time a dashboard is opened, especially on a kiosk/wall-mounted display nobody has touched yet — tap the banner's **Enable** button once and everything (including the command that got blocked) plays normally for the rest of that page load.
 
 ## Current support
 

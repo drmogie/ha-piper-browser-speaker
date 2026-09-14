@@ -143,12 +143,10 @@
         case "play_media":
           this._mediaTitle = this._deriveTitle(msg.media_id);
           this._audio.src = msg.media_id;
-          this._audio
-            .play()
-            .catch((err) => console.error("Piper Browser Speaker: play failed", err));
+          this._attemptPlay(this._audio);
           break;
         case "play":
-          this._audio.play().catch(() => {});
+          this._attemptPlay(this._audio);
           break;
         case "pause":
           this._audio.pause();
@@ -172,12 +170,10 @@
           const wasPlaying = !this._audio.paused && !this._audio.ended;
           if (wasPlaying) this._audio.pause();
           this._announceAudio.src = msg.media_id;
-          this._announceAudio
-            .play()
-            .catch((err) => console.error("Piper Browser Speaker: announce failed", err));
           this._announceAudio.onended = () => {
-            if (wasPlaying) this._audio.play().catch(() => {});
+            if (wasPlaying) this._attemptPlay(this._audio);
           };
+          this._attemptPlay(this._announceAudio);
           break;
         }
         default:
@@ -220,6 +216,16 @@
           .title { font-weight: 500; }
           .now-playing { color: var(--secondary-text-color); font-size: 0.9em; margin-bottom: 8px; min-height: 1.2em; }
           audio { width: 100%; }
+          .audio-lock {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            background: var(--warning-color, #ffa600); color: #000;
+            border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: 0.9em;
+          }
+          .audio-lock[hidden] { display: none; }
+          .audio-lock button {
+            border: none; border-radius: 6px; padding: 6px 12px; font-weight: 600;
+            background: #000; color: #fff; cursor: pointer; flex-shrink: 0;
+          }
         </style>
         <ha-card>
           <div class="row">
@@ -227,6 +233,10 @@
             <span class="title" id="title"></span>
           </div>
           <div class="status" id="status">Select an entity in the card editor</div>
+          <div class="audio-lock" id="audio-lock" hidden>
+            <span>🔇 Browser blocked audio - tap to enable</span>
+            <button id="unlock-btn">Enable</button>
+          </div>
           <div class="now-playing" id="now-playing"></div>
           <audio id="audio" controls></audio>
         </ha-card>
@@ -254,6 +264,52 @@
           : "";
         this._reportState({ media_title: this._mediaTitle || "" });
       });
+      shadow.getElementById("unlock-btn").addEventListener("click", () => this._unlockAudio());
+    }
+
+    // Browsers block a script-triggered play() (no click/tap behind it -
+    // exactly what every command arriving over the websocket is) until the
+    // user has directly interacted with the page at least once. A kiosk/
+    // wall-mounted dashboard that nobody has tapped since it loaded hits
+    // this on the very first command. Attempt playback normally; if the
+    // browser refuses it specifically for that reason, surface a one-time
+    // "tap to enable" prompt and remember how to retry the exact same
+    // playback once the user taps it, rather than just failing silently.
+    _attemptPlay(audioEl) {
+      return audioEl.play().catch((err) => {
+        if (err && err.name === "NotAllowedError") {
+          this._pendingRetry = () => this._attemptPlay(audioEl);
+          this._setAudioLocked(true);
+        } else {
+          // eslint-disable-next-line no-console
+          console.error("Piper Browser Speaker: playback failed", err);
+        }
+      });
+    }
+
+    _setAudioLocked(locked) {
+      if (!this.shadowRoot) return;
+      this.shadowRoot.getElementById("audio-lock").hidden = !locked;
+    }
+
+    _unlockAudio() {
+      // This runs inside a real click handler, so play()-then-immediately-
+      // pause() on both audio elements here counts as the user gesture
+      // browsers require - Chrome remembers it for the rest of this page's
+      // lifetime (any element, any future command); Safari/WebKit only
+      // unlocks the specific element played, which is exactly why both are
+      // primed here rather than just one.
+      [this._audio, this._announceAudio].forEach((el) => {
+        el.play()
+          .then(() => el.pause())
+          .catch(() => {});
+      });
+      this._setAudioLocked(false);
+      if (this._pendingRetry) {
+        const retry = this._pendingRetry;
+        this._pendingRetry = null;
+        retry();
+      }
     }
 
     _setStatus(kind) {

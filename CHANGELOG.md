@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026.09.14.9
+- Fixed announcements (and any playback) silently failing with a `NotAllowedError` in the browser console when the dashboard tab hadn't had a direct tap/click yet - browsers refuse script-triggered audio until the page has real user interaction, which every command from Home Assistant is (there's no click behind it). The card now shows a "Browser blocked audio - tap to enable" banner when this happens and automatically retries the exact playback that got blocked as soon as it's tapped - a one-time thing per page load, most relevant to a kiosk/wall-mounted display nobody has touched since it loaded.
+
 ## 2026.09.14.8
 - Fixed the integration icon being unreadable in the integrations list. The full speaker-grille logo is great at full size but reads as a plain dark circle at the 40px icon size Home Assistant actually uses - `icon.png`/`icon@2x.png` are now a tighter crop of just the blue Home Assistant badge mark, which stays recognizable at small sizes. `logo.png`/`logo@2x.png` are unchanged (the full grille image, used in larger contexts like the integration's detail page).
 
