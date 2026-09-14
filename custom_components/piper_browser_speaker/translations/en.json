@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a browser speaker",
+        "description": "Give this speaker a name. You'll pick it when adding the companion card to a dashboard.",
+        "data": {
+          "name": "Name"
+        }
+      }
+    },
+    "error": {
+      "name_required": "Enter a name for this speaker."
+    },
+    "abort": {
+      "already_configured": "A speaker with this name already exists."
+    }
+  }
+}
