@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import logging
 
+from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     ATTR_MEDIA_ANNOUNCE,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
+    async_process_play_media_url,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -118,7 +120,22 @@ class PiperBrowserSpeaker(MediaPlayerEntity):
         calling this same method with the generated audio URL. When called
         with announce=True, tell the card to duck-and-resume instead of
         replacing whatever is currently playing.
+
+        TTS/Assist and media browsing hand us a virtual media-source://
+        reference rather than a real URL - the browser has no idea what to
+        do with that, so it has to be resolved to an actual playable URL
+        first (and, if that URL is relative to this HA instance, made
+        absolute) before it's sent to the card.
         """
+        if media_source.is_media_source_id(media_id):
+            sourced_media = await media_source.async_resolve_media(
+                self.hass, media_id, self.entity_id
+            )
+            media_type = sourced_media.mime_type
+            media_id = sourced_media.url
+
+        media_id = async_process_play_media_url(self.hass, media_id)
+
         command_type = "announce" if kwargs.get(ATTR_MEDIA_ANNOUNCE) else "play_media"
         self._send_command(
             {"type": command_type, "media_id": media_id, "media_type": media_type}

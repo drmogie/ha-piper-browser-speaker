@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.09.14.6
+- Fixed TTS/Assist announcements never being heard. `tts.speak` (and Assist pipeline responses, and browsed media) hand `async_play_media` a virtual `media-source://...` reference, not a real audio URL - sending that straight to the browser card produced a hard "Format error" on the announcement's audio element, since browsers don't understand the `media-source:` scheme. `async_play_media` now resolves any `media_source` id to its real, playable URL (and makes a relative one absolute) before sending it to the card, the same way Home Assistant's own Cast integration does it. Plain direct-URL playback (e.g. calling `media_player.play_media` with a plain `https://...` link, as used for earlier testing) is unaffected - it already worked and still does.
+- No config changes needed - existing speakers pick this up automatically after updating.
+
 ## 2026.09.14.5
 - Fixed announcements never resuming the main track afterward. The card's `connectedCallback()` used a different (and async-unsafe) guard than the rest of the subscribe logic, so a dashboard reflow (e.g. Lovelace Sections reparenting the card) could open a second, independent subscription to the same entity while the first was still connecting. Every command from the backend then arrived twice - the second, spurious delivery of an `announce` command always computed "nothing was playing," overwriting the real resume handler with a no-op. `connectedCallback()` now uses the same synchronous guard as the rest of the card, and a stale in-flight subscription (from a reconnect that happens before the previous one finishes) now closes itself instead of staying live.
 - No config changes needed - existing speakers pick this up automatically after updating.
