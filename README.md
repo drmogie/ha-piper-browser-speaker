@@ -18,7 +18,7 @@ Add this repository to HACS (category: Integration), install, then restart Home 
 
 ### Manual
 
-Copy `custom_components/piper_browser_speaker` into your `config/custom_components/` folder and restart Home Assistant.
+Copy `custom_components/piper_browser_speaker` into your `config/custom_components/` folder and restart Home Assistant. Its icon (built from the logo you provided) should show up automatically — Home Assistant 2026.3+ reads brand images straight out of the integration's own `brand/` folder.
 
 ## Setup
 

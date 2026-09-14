@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026.09.14.7
+- Added the integration's logo/icon (`custom_components/piper_browser_speaker/brand/`), served locally via Home Assistant 2026.3's custom-integration `brand/` folder support - shows up automatically on the integration entry, no submission to the home-assistant/brands repo needed.
+
 ## 2026.09.14.6
 - Fixed TTS/Assist announcements never being heard. `tts.speak` (and Assist pipeline responses, and browsed media) hand `async_play_media` a virtual `media-source://...` reference, not a real audio URL - sending that straight to the browser card produced a hard "Format error" on the announcement's audio element, since browsers don't understand the `media-source:` scheme. `async_play_media` now resolves any `media_source` id to its real, playable URL (and makes a relative one absolute) before sending it to the card, the same way Home Assistant's own Cast integration does it. Plain direct-URL playback (e.g. calling `media_player.play_media` with a plain `https://...` link, as used for earlier testing) is unaffected - it already worked and still does.
 - No config changes needed - existing speakers pick this up automatically after updating.
