@@ -134,7 +134,21 @@ class PiperBrowserSpeaker(MediaPlayerEntity):
             media_type = sourced_media.mime_type
             media_id = sourced_media.url
 
-        media_id = async_process_play_media_url(self.hass, media_id)
+        # Keep the URL relative when possible (allow_relative_url=True) instead of
+        # letting Home Assistant absolutize it against its configured internal/
+        # external URL. This card's "device" is whatever browser tab the dashboard
+        # is already open in - that tab has to fetch the audio itself, so the URL
+        # needs to resolve against the origin that tab is already loaded from, not
+        # HA's guess at internal vs. external. A relative URL does that for free
+        # (browsers resolve a bare path against the current page's own origin), and
+        # sidesteps the case where HA's internal URL is a plain-HTTP LAN address but
+        # the dashboard is being viewed over HTTPS through a reverse proxy/tunnel -
+        # mixing those (an https:// page loading an http:// audio file) gets the
+        # request blocked outright as mixed content. An already-absolute media_id
+        # (e.g. a plain external URL used directly) is untouched either way.
+        media_id = async_process_play_media_url(
+            self.hass, media_id, allow_relative_url=True
+        )
 
         command_type = "announce" if kwargs.get(ATTR_MEDIA_ANNOUNCE) else "play_media"
         self._send_command(

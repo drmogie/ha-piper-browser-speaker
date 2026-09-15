@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.09.15.1
+- Fixed TTS/announcements (and any media-source playback) failing to load at all when the dashboard is viewed over HTTPS through a reverse proxy or remote-access tunnel, with Home Assistant's *internal* URL set to a plain-HTTP local address. `async_play_media` used to always turn the audio path into a full URL using Home Assistant's own internal/external URL setting - on a setup like that, it built an `http://` link on a page loaded over `https://`, which browsers block outright as mixed content (silently - no error dialog, nothing plays, and the console shows `Mixed Content` / `NotSupportedError`). The URL sent to the card is now kept relative whenever possible, so it resolves against whatever origin the dashboard tab is already using - the tab that has to actually fetch and play it. A plain external URL passed directly to `play_media` is unaffected either way.
+- No config changes needed - existing speakers pick this up automatically after updating.
+
 ## 2026.09.14.9
 - Fixed announcements (and any playback) silently failing with a `NotAllowedError` in the browser console when the dashboard tab hadn't had a direct tap/click yet - browsers refuse script-triggered audio until the page has real user interaction, which every command from Home Assistant is (there's no click behind it). The card now shows a "Browser blocked audio - tap to enable" banner when this happens and automatically retries the exact playback that got blocked as soon as it's tapped - a one-time thing per page load, most relevant to a kiosk/wall-mounted display nobody has touched since it loaded.
 
