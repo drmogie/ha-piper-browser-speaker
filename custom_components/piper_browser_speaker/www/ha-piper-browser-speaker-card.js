@@ -43,7 +43,10 @@
   // isn't room for a legible logo next to the name/status text, so it's
   // hidden and the text gets the card's full width back ("anything small
   // should just be the text").
-  const LOGO_HIDE_WIDTH_DEFAULT = 220;
+  // 2026.09.16.9: baseline defaults updated to Mogie's own tuned settings
+  // (previously 220/16 - see the CHANGELOG for the full list) now that he's
+  // dialed in a layout he wants every new card to start from.
+  const LOGO_HIDE_WIDTH_DEFAULT = 375;
   // Logo's fixed size and its distance from the card's right (padding) edge,
   // in pixels - all three are also exposed as `logo_width`/`logo_height`/
   // `logo_right_offset` card config options (see the editor below) so they
@@ -53,9 +56,9 @@
   // A CSS position: absolute child's "right: 0" sits flush with its
   // containing block's PADDING edge (i.e. right at ha-card's border, not
   // inset by ha-card's own 16px padding the way the text content is) - so
-  // this defaults to 16px to visually match that same inset rather than
-  // sitting flush against the card's edge.
-  const LOGO_RIGHT_OFFSET_DEFAULT = 16;
+  // this defaults to a value close to that inset rather than sitting flush
+  // against the card's edge.
+  const LOGO_RIGHT_OFFSET_DEFAULT = 50;
 
   // Labels for the playback state shown alongside the connection status
   // (e.g. "Connected (Playing)") - mirrors the state strings this card
@@ -65,18 +68,36 @@
   const PLAYBACK_LABELS = { idle: "Idle", playing: "Playing", paused: "Paused", announcing: "Announcing" };
 
   // Anchor corners available for the "device name row" and "status text"
-  // segments' optional custom positioning - an empty anchor means "leave it
-  // in the card's normal top-to-bottom layout" (the existing/default
-  // behavior), any other value pins that segment via position: absolute at
-  // a fixed pixel offset from that corner, same idea as the logo's own
-  // fixed right-edge pinning above.
+  // segments' optional custom positioning. Three-way meaning, since 2026.09.16.9:
+  //  - "" (field left on "Use default") -> falls back to that segment's own
+  //    *_ANCHOR_DEFAULT constant below (now a real corner, per Mogie's
+  //    tuned defaults - previously "" meant "no position" too, but now that
+  //    the baked-in default IS a position, "unset" and "explicitly off" are
+  //    no longer the same thing and need distinct values).
+  //  - "none" -> explicitly opts back OUT of custom positioning, back to
+  //    the card's plain top-to-bottom layout, regardless of the default.
+  //  - any corner value -> pins that segment via position: absolute at a
+  //    fixed pixel offset from that corner, same idea as the logo's own
+  //    fixed right-edge pinning above.
   const SEGMENT_ANCHOR_OPTIONS = [
-    { value: "", label: "Default (normal layout)" },
+    { value: "", label: "Use default" },
+    { value: "none", label: "Normal layout (no custom position)" },
     { value: "top-left", label: "Top-left corner" },
     { value: "top-right", label: "Top-right corner" },
     { value: "bottom-left", label: "Bottom-left corner" },
     { value: "bottom-right", label: "Bottom-right corner" },
   ];
+  const ROW_ANCHOR_DEFAULT = "top-left";
+  const ROW_OFFSET_X_DEFAULT = 15;
+  const ROW_OFFSET_Y_DEFAULT = 5;
+  const STATUS_ANCHOR_DEFAULT = "bottom-left";
+  const STATUS_OFFSET_X_DEFAULT = 15;
+  const STATUS_OFFSET_Y_DEFAULT = 5;
+  // Below this card width the status text hides entirely, same idea as
+  // LOGO_HIDE_WIDTH_DEFAULT - 0 means "never hide" (off by default; unlike
+  // the position defaults above, Mogie didn't ask for a specific threshold
+  // here, so this stays opt-in rather than guessing a number for him).
+  const STATUS_HIDE_WIDTH_DEFAULT = 0;
 
   class HaPiperBrowserSpeakerCard extends HTMLElement {
     setConfig(config) {
@@ -158,24 +179,44 @@
       this._logoWidth = Number.isFinite(logoWidth) && logoWidth > 0 ? logoWidth : LOGO_WIDTH_DEFAULT;
       this._logoHeight = Number.isFinite(logoHeight) && logoHeight > 0 ? logoHeight : LOGO_HEIGHT_DEFAULT;
       this._logoRightOffset = Number.isFinite(logoRightOffset) && logoRightOffset >= 0 ? logoRightOffset : LOGO_RIGHT_OFFSET_DEFAULT;
+      // Status text hide-below-width threshold - same idea/shape as the
+      // logo's own logo_hide_width above.
+      const statusHideWidth = Number(this._config.status_hide_width);
+      this._statusHideWidth =
+        Number.isFinite(statusHideWidth) && statusHideWidth > 0 ? statusHideWidth : STATUS_HIDE_WIDTH_DEFAULT;
+
       this._applyLogoLayout();
-      if (this._card) this._applyLogoVisibility(this._card.getBoundingClientRect().width);
+      if (this._card) {
+        const cardWidth = this._card.getBoundingClientRect().width;
+        this._applyLogoVisibility(cardWidth);
+        this._applyStatusVisibility(cardWidth);
+      }
 
       // Optional custom positioning for the device-name row and the status
-      // text, same fixed-pixel-anchor idea as the logo above - left on
-      // "Default", each stays exactly where it's always been (normal
-      // top-to-bottom flex flow), so this is fully opt-in.
+      // text, same fixed-pixel-anchor idea as the logo above. Left on "Use
+      // default" (an unset/empty config value), each falls back to its own
+      // *_ANCHOR_DEFAULT constant; picking "Normal layout" explicitly opts
+      // back out to the card's plain top-to-bottom flow instead.
+      const rowAnchorRaw = this._config.row_anchor;
+      const rowAnchor = rowAnchorRaw != null && rowAnchorRaw !== "" ? rowAnchorRaw : ROW_ANCHOR_DEFAULT;
+      const rowOffsetX = Number(this._config.row_offset_x);
+      const rowOffsetY = Number(this._config.row_offset_y);
       this._applySegmentPosition(
         this._row,
-        this._config.row_anchor,
-        Number(this._config.row_offset_x) || 0,
-        Number(this._config.row_offset_y) || 0
+        rowAnchor,
+        Number.isFinite(rowOffsetX) ? rowOffsetX : ROW_OFFSET_X_DEFAULT,
+        Number.isFinite(rowOffsetY) ? rowOffsetY : ROW_OFFSET_Y_DEFAULT
       );
+
+      const statusAnchorRaw = this._config.status_anchor;
+      const statusAnchor = statusAnchorRaw != null && statusAnchorRaw !== "" ? statusAnchorRaw : STATUS_ANCHOR_DEFAULT;
+      const statusOffsetX = Number(this._config.status_offset_x);
+      const statusOffsetY = Number(this._config.status_offset_y);
       this._applySegmentPosition(
         this._statusEl,
-        this._config.status_anchor,
-        Number(this._config.status_offset_x) || 0,
-        Number(this._config.status_offset_y) || 0
+        statusAnchor,
+        Number.isFinite(statusOffsetX) ? statusOffsetX : STATUS_OFFSET_X_DEFAULT,
+        Number.isFinite(statusOffsetY) ? statusOffsetY : STATUS_OFFSET_Y_DEFAULT
       );
 
       const entityId = this._config.entity;
@@ -352,6 +393,11 @@
             margin: 0;
             white-space: nowrap;
           }
+          /* Toggled by _applyStatusVisibility() below status_hide_width -
+             works the same whether or not .status is also .positioned. */
+          .status.hide-status {
+            display: none;
+          }
           .dot {
             width: 10px; height: 10px; border-radius: 50%;
             background: var(--disabled-text-color, #bdbdbd); flex-shrink: 0;
@@ -527,7 +573,10 @@
       if (typeof ResizeObserver === "undefined" || !this._card) return;
       this._logoSizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0];
-        if (entry) this._applyLogoVisibility(entry.contentRect.width);
+        if (entry) {
+          this._applyLogoVisibility(entry.contentRect.width);
+          this._applyStatusVisibility(entry.contentRect.width);
+        }
       });
       this._logoSizeObserver.observe(this._card);
     }
@@ -556,13 +605,25 @@
       this._content.style.paddingRight = hideLogo ? "0px" : `${logoWidth + logoRightOffset + 12}px`;
     }
 
+    // Hides the status text entirely below a configurable card width -
+    // status_hide_width, off (0/unset) by default. Same shape as
+    // _applyLogoVisibility above, just simpler (no reserved-space/padding
+    // side effect to also manage, since hiding the status text doesn't
+    // need to give its space back to anything else the way the logo does).
+    _applyStatusVisibility(width) {
+      if (!this._statusEl) return;
+      const hideWidth = this._statusHideWidth || STATUS_HIDE_WIDTH_DEFAULT;
+      const hide = hideWidth > 0 && width < hideWidth;
+      this._statusEl.classList.toggle("hide-status", hide);
+    }
+
     // Pins a segment (the device-name row, or the status text) to a fixed
     // corner + pixel offset, or clears that and lets it sit back in the
     // card's normal top-to-bottom flow when anchor is empty/falsy. Same
     // pattern as _applyLogoLayout, generalized to any element.
     _applySegmentPosition(el, anchor, offsetX, offsetY) {
       if (!el) return;
-      const positioned = !!anchor;
+      const positioned = !!anchor && anchor !== "none";
       el.classList.toggle("positioned", positioned);
       el.style.top = "";
       el.style.right = "";
@@ -764,10 +825,21 @@
         this._sectionsWrap.appendChild(this._makeSection("Logo position & size", logoFieldsWrap));
 
         this._sectionsWrap.appendChild(
-          this._makeSection("Device name row position", this._makeSegmentPositionFields("row"))
+          this._makeSection(
+            "Device name row position",
+            this._makeSegmentPositionFields("row", ROW_OFFSET_X_DEFAULT, ROW_OFFSET_Y_DEFAULT)
+          )
         );
         this._sectionsWrap.appendChild(
-          this._makeSection("Status text position", this._makeSegmentPositionFields("status"))
+          this._makeSection(
+            "Status text position",
+            this._makeSegmentPositionFields(
+              "status",
+              STATUS_OFFSET_X_DEFAULT,
+              STATUS_OFFSET_Y_DEFAULT,
+              STATUS_HIDE_WIDTH_DEFAULT
+            )
+          )
         );
       }
 
@@ -842,19 +914,34 @@
     // The anchor dropdown + x/y offset fields shared by the row and status
     // segments - `prefix` is "row" or "status", matching the card's own
     // row_anchor/row_offset_x/row_offset_y (and status_* equivalents) config
-    // keys read in _updateFromConfig().
-    _makeSegmentPositionFields(prefix) {
+    // keys read in _updateFromConfig(). `hideWidthDefault`, when given,
+    // additionally adds a "hide below this card width" field (currently
+    // only used for the status segment) - key `${prefix}_hide_width`.
+    _makeSegmentPositionFields(prefix, offsetXDefault, offsetYDefault, hideWidthDefault) {
       const wrap = document.createElement("div");
       wrap.style.cssText = "display:flex; gap:12px; flex-wrap:wrap;";
       wrap.appendChild(
         this._makeSelectField("Position", `${prefix}_anchor`, SEGMENT_ANCHOR_OPTIONS).label
       );
-      wrap.appendChild(this._makeNumberField("Offset from edge, horizontal (px)", `${prefix}_offset_x`, 0).label);
-      wrap.appendChild(this._makeNumberField("Offset from edge, vertical (px)", `${prefix}_offset_y`, 0).label);
+      wrap.appendChild(
+        this._makeNumberField("Offset from edge, horizontal (px)", `${prefix}_offset_x`, offsetXDefault).label
+      );
+      wrap.appendChild(
+        this._makeNumberField("Offset from edge, vertical (px)", `${prefix}_offset_y`, offsetYDefault).label
+      );
+      if (hideWidthDefault != null) {
+        wrap.appendChild(
+          this._makeNumberField(
+            "Hide below card width (px, 0 = never hide)",
+            `${prefix}_hide_width`,
+            hideWidthDefault
+          ).label
+        );
+      }
       const hint = document.createElement("div");
       hint.style.cssText = "font-size:0.8em; color: var(--secondary-text-color); margin-top:4px; width:100%;";
       hint.textContent =
-        'Leave "Default" to keep this where it normally sits in the card. Pick a corner to pin it there instead.';
+        'Leave "Use default" to use the card\'s built-in default position, or pick "Normal layout" to go back to the plain top-to-bottom card layout.';
       wrap.appendChild(hint);
       return wrap;
     }

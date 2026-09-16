@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026.09.16.9
+- Updated the built-in defaults every new card starts from: logo width/height 110px/110px (unchanged), logo distance from the right edge 50px (was 16px), logo hides below a 375px-wide card (was 220px), device-name row defaults to the top-left corner with a 15px/5px horizontal/vertical offset, and the status text defaults to the bottom-left corner with a 15px/5px horizontal/vertical offset - all only apply when the matching config option is left unset, so an already-tuned card's own saved values are untouched.
+- The row/status "Position" dropdown now has a third choice, "Normal layout (no custom position)", separate from "Use default" - since the default is now an actual pinned position rather than "no position," this is how to explicitly go back to the plain top-to-bottom card layout instead.
+- Added a "Hide below card width (px, 0 = never hide)" option for the status text, off by default - same idea as the logo's own hide-below-width option, in the card editor's "Status text position" section.
+
 ## 2026.09.16.8
 - Fixed the editor's logo size/position number fields not showing your actual saved values when reopening the card editor - they used to always show the blank/default placeholder even though the real values (visible in the YAML view) were saved correctly all along. The fields now re-read the saved config every time the editor renders, not just the first time it's built.
 - Fixed the "Connected (Playing/Idle/Paused)" status text never changing while the logo's bounce animation worked fine. Root cause: a TTS/announcement plays on a separate audio channel from the main track, and that channel was only ever wired to drive the bounce - never the status text. It now also shows "Connected (Announcing)" while a TTS message or announcement is actually playing, without changing the entity's actual reported state (an announcement is still a brief duck-and-resume of the main track, not a real state change).
