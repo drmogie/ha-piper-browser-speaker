@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026.09.16.6
+- The logo hide/right-align/center width thresholds from `.16.5` are now also card config options (`logo_hide_width`/`logo_center_width` in px, with number fields in the card editor) instead of only fixed defaults - real Sections column widths turned out to vary enough that the previous defaults skipped straight from "hidden" to "centered" on some card sizes without ever showing the right-aligned in-between state, so these can now be nudged per dashboard without needing a new release each time. Widened the default gap between the two (220px / 420px) as a better starting point based on that testing.
+- The "Connected" status line now also shows what's actually happening - e.g. "Connected (Playing)" / "Connected (Idle)" / "Connected (Paused)" - instead of a bare "Connected" that gave no sense of whether anything was going on.
+- The status line (and anything below it) now sinks to the bottom of the card when the card has been given real extra height beyond its content in the Sections editor, instead of always sitting right under the logo with a gap of empty space below it. No effect on the default auto-sized card, same as the card's other height rules.
+
 ## 2026.09.16.5
 - On a narrow card, the logo no longer squeezes in next to the name/status text - it now hides entirely below a certain card width (roughly a "6-columns-wide" Sections card), then reappears pinned to the right edge once there's a bit more room, and only centers under the name/status once the card is wide enough for that to look right. This reads the card's actual on-screen size (not a CSS container query, which doesn't play well with Sections' default auto-height sizing), so it responds correctly whether the card is left on Sections' default sizing or given a fixed size. The exact width cutoffs are a starting guess - happy to nudge them if they don't land in the right spot on your dashboard.
 
