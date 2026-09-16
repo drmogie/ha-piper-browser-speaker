@@ -14,7 +14,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CARD_URL, CARD_VERSION, DOMAIN, PLATFORMS
+from .const import CARD_URL, CARD_VERSION, DOMAIN, PLATFORMS, STATIC_URL_ROOT
 from .websocket_api import async_register_websocket_commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,11 +42,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     lock = domain_data.setdefault("_setup_lock", asyncio.Lock())
     async with lock:
         if not domain_data.get("_frontend_registered"):
-            www_path = hass.config.path(
-                "custom_components", DOMAIN, "www", CARD_URL.rsplit("/", 1)[-1]
-            )
+            # Register the whole www/ folder as one static directory (not
+            # just the card's own .js file) - 2026.09.16.10, so the logo
+            # (piper-logo.webp) and any future static asset are servable
+            # without each needing their own separate registration. The
+            # card's JS is still reached at the same CARD_URL as before,
+            # since that's just this directory root + the filename.
+            www_dir = hass.config.path("custom_components", DOMAIN, "www")
             await hass.http.async_register_static_paths(
-                [StaticPathConfig(CARD_URL, www_path, True)]
+                [StaticPathConfig(STATIC_URL_ROOT, www_dir, True)]
             )
             add_extra_js_url(hass, f"{CARD_URL}?v={CARD_VERSION}")
             domain_data["_frontend_registered"] = True
