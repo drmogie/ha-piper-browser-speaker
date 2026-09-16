@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.09.16.3
+- Fixed the logo drifting far away from the device name/status text when the card is placed in an unusually wide spot on a Sections dashboard (it was centering across the card's full width, which reads fine on a normal single-column card but looks disconnected from the left-aligned text on a wide one). It's still centered under the name row - this specifically fixes it looking "stuck in a corner" on a wide card.
+- Fixed the logo (and the rest of the card's content) potentially spilling past the bottom edge of a card that's been manually resized small in the Sections editor. The logo now scales to fit BOTH the card's actual width and height (not width alone), so it shrinks along with a short card instead of staying tall enough to push the status text outside the card.
+
 ## 2026.09.16.2
 - Reordered the card layout: the status dot + device name are now at the top, the logo sits below that (centered), and the connection status text is below the logo.
 - The logo now scales with the card's own size (a percentage width with sensible min/max caps) instead of staying a fixed pixel size regardless of how wide or narrow the card is.

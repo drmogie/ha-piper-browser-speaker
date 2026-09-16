@@ -209,17 +209,64 @@
       const shadow = this.attachShadow({ mode: "open" });
       shadow.innerHTML = `
         <style>
-          ha-card { padding: 16px; }
-          .logo-wrap { display: flex; justify-content: center; margin: 4px 0 8px; }
+          :host { display: block; height: 100%; }
+          ha-card {
+            padding: 16px;
+            box-sizing: border-box;
+            /* Fills whatever height the placed card actually has (its
+               Sections grid cell, when the card has been manually resized
+               there) instead of only ever growing to fit its own content -
+               that's what lets the logo below know how much vertical room
+               it really has, and lets it shrink instead of spilling past
+               the card's own bottom edge on a small/short card. The tiny
+               min-height is only there so the card never collapses to
+               nothing on a layout that doesn't stretch it (e.g. before
+               it's ever been sized in the editor) - deliberately small so
+               it never itself forces the card taller than a real small
+               size the user picked. */
+            height: 100%;
+            min-height: 48px;
+            display: flex;
+            flex-direction: column;
+            /* Establishes a query container sized by the two rules above, so
+               .logo below can size itself off the card's own actual width
+               AND height (cqw/cqh) instead of width alone. */
+            container-type: size;
+          }
+          .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex: 0 0 auto; }
+          .dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--disabled-text-color, #bdbdbd); flex-shrink: 0;
+          }
+          .dot.connected { background: var(--success-color, #43a047); }
+          .dot.error { background: var(--error-color, #db4437); }
+          .status { color: var(--secondary-text-color); font-size: 0.9em; flex: 0 0 auto; }
+          .title { font-weight: 500; }
+          .now-playing { color: var(--secondary-text-color); font-size: 0.9em; margin-bottom: 8px; min-height: 1.2em; flex: 0 0 auto; }
+          .logo-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 4px 0 8px;
+            /* Takes whatever vertical space is left after the row/status/etc
+               above and below claim theirs, and is allowed to actually
+               shrink (min-height: 0 overrides flexbox's default of never
+               shrinking below content size) - this, plus overflow: hidden,
+               is what stops the logo from ever pushing the status text
+               outside the card's own bottom edge on a short/small card. */
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+          }
           .logo {
-            /* Percentage width (of the card's own content box) plus a cap,
-               rather than a fixed pixel size, so the logo scales up or down
-               with the card itself - e.g. a narrower column in a Sections
-               layout, or the card resized wider - instead of staying a fixed
-               size no matter how much room the card actually has. */
-            width: 35%;
+            /* Sized off the card's own container query width/height (not the
+               page viewport), capped so it never grows past a sensible size
+               on a large card and never shrinks below something recognizable
+               on a tiny one. Scaling on BOTH axes (not just width) is what
+               keeps it from overflowing a card that's wide but short, and
+               keeps it a true circle at any size via aspect-ratio. */
+            width: min(35cqw, 60cqh, 120px);
             min-width: 40px;
-            max-width: 120px;
             height: auto;
             aspect-ratio: 1 / 1;
             display: block;
@@ -232,16 +279,6 @@
             0%, 100% { transform: translateY(0) scale(1); }
             50% { transform: translateY(-5px) scale(1.05); }
           }
-          .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-          .dot {
-            width: 10px; height: 10px; border-radius: 50%;
-            background: var(--disabled-text-color, #bdbdbd); flex-shrink: 0;
-          }
-          .dot.connected { background: var(--success-color, #43a047); }
-          .dot.error { background: var(--error-color, #db4437); }
-          .status { color: var(--secondary-text-color); font-size: 0.9em; }
-          .title { font-weight: 500; }
-          .now-playing { color: var(--secondary-text-color); font-size: 0.9em; margin-bottom: 8px; min-height: 1.2em; }
           /* The audio element is playback-only here - no scrubber/controls bar.
              Hiding it doesn't affect playback; HTMLMediaElement works the same
              whether or not it's rendered. */
@@ -250,6 +287,7 @@
             display: flex; align-items: center; justify-content: space-between; gap: 8px;
             background: var(--warning-color, #ffa600); color: #000;
             border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: 0.9em;
+            flex: 0 0 auto;
           }
           .audio-lock[hidden] { display: none; }
           .audio-lock button {
