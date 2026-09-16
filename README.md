@@ -44,6 +44,7 @@ Repeat steps 1–4 for each additional browser/device you want to turn into a sp
 - Volume set / mute
 - Live connected/disconnected availability
 - TTS / announcements (`tts.speak`, Assist pipeline responses, or `media_player.play_media` with `announce: true`) — ducks whatever's playing, plays the announcement, then resumes where it left off, always at full volume regardless of the main track's volume/mute
+- The card shows the Piper Browser Speaker logo, which bounces gently while anything is actually playing (main track or an announcement)
 
 Not yet supported: media browsing, queueing. Planned as a possible future addition.
 

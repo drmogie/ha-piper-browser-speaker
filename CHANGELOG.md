@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.09.16.1
+- The card now shows the Piper Browser Speaker logo (a small, resized copy embedded directly in the card - no extra file to load) instead of just a status dot and title.
+- Removed the native audio scrubber/play-bar - playback is still handled by the same `<audio>` element, it's just no longer shown, since the entity's own controls (Developer Tools, a media control card, voice commands, etc.) are what actually start/stop it.
+- The logo now gently bounces while anything is actually playing through the speaker - the main track or a TTS/announcement - and stops as soon as playback pauses or ends.
+- No config changes needed - existing speakers pick this up automatically after updating.
+
 ## 2026.09.15.1
 - Fixed TTS/announcements (and any media-source playback) failing to load at all when the dashboard is viewed over HTTPS through a reverse proxy or remote-access tunnel, with Home Assistant's *internal* URL set to a plain-HTTP local address. `async_play_media` used to always turn the audio path into a full URL using Home Assistant's own internal/external URL setting - on a setup like that, it built an `http://` link on a page loaded over `https://`, which browsers block outright as mixed content (silently - no error dialog, nothing plays, and the console shows `Mixed Content` / `NotSupportedError`). The URL sent to the card is now kept relative whenever possible, so it resolves against whatever origin the dashboard tab is already using - the tab that has to actually fetch and play it. A plain external URL passed directly to `play_media` is unaffected either way.
 - No config changes needed - existing speakers pick this up automatically after updating.
