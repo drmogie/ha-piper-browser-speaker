@@ -209,29 +209,28 @@
       const shadow = this.attachShadow({ mode: "open" });
       shadow.innerHTML = `
         <style>
-          :host { display: block; height: 100%; }
+          :host { display: block; }
           ha-card {
             padding: 16px;
             box-sizing: border-box;
-            /* Fills whatever height the placed card actually has (its
-               Sections grid cell, when the card has been manually resized
-               there) instead of only ever growing to fit its own content -
-               that's what lets the logo below know how much vertical room
-               it really has, and lets it shrink instead of spilling past
-               the card's own bottom edge on a small/short card. The tiny
-               min-height is only there so the card never collapses to
-               nothing on a layout that doesn't stretch it (e.g. before
-               it's ever been sized in the editor) - deliberately small so
-               it never itself forces the card taller than a real small
-               size the user picked. */
+            /* height: 100% only actually does anything when the card has
+               been given a genuinely fixed size (a specific row count) in
+               the Sections editor - it gracefully has NO effect (behaves
+               like the default "auto") when the card is left on Sections'
+               default "fit to content" sizing, since a percentage height
+               against an indefinite ancestor height just resolves to auto.
+               That's deliberate: it's what lets the same CSS work for both
+               modes without fighting either one. (An earlier attempt at
+               this used CSS container queries (container-type: size),
+               which does NOT degrade
+               gracefully the same way - it actively forces an indefinite/
+               content-based ancestor toward a zero-ish height instead,
+               which is what caused the logo to render squished/clipped on
+               several real card sizes - removed for that reason.) */
             height: 100%;
             min-height: 48px;
             display: flex;
             flex-direction: column;
-            /* Establishes a query container sized by the two rules above, so
-               .logo below can size itself off the card's own actual width
-               AND height (cqw/cqh) instead of width alone. */
-            container-type: size;
           }
           .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex: 0 0 auto; }
           .dot {
@@ -248,26 +247,31 @@
             justify-content: center;
             align-items: center;
             margin: 4px 0 8px;
-            /* Takes whatever vertical space is left after the row/status/etc
-               above and below claim theirs, and is allowed to actually
-               shrink (min-height: 0 overrides flexbox's default of never
-               shrinking below content size) - this, plus overflow: hidden,
-               is what stops the logo from ever pushing the status text
-               outside the card's own bottom edge on a short/small card. */
-            flex: 1 1 auto;
+            /* flex: 0 1 auto (not 1 1 auto) - takes its natural size instead
+               of greedily growing to fill all leftover space, which is what
+               was crowding the status text right up against the card's
+               bottom edge on a tall card. min-height: 0 + overflow: hidden
+               still let it shrink instead of spilling past a short card. */
+            flex: 0 1 auto;
             min-height: 0;
             overflow: hidden;
           }
           .logo {
-            /* Sized off the card's own container query width/height (not the
-               page viewport), capped so it never grows past a sensible size
-               on a large card and never shrinks below something recognizable
-               on a tiny one. Scaling on BOTH axes (not just width) is what
-               keeps it from overflowing a card that's wide but short, and
-               keeps it a true circle at any size via aspect-ratio. */
-            width: min(35cqw, 60cqh, 120px);
+            /* Percentage width, capped, exactly as before - this is what
+               scales it with a narrow/wide card. max-height: 100% is the
+               new part: on a card with a real fixed height (see the ha-card
+               comment above), it bounds the logo to whatever vertical room
+               is actually left, and aspect-ratio keeps it a true circle by
+               shrinking width to match rather than letting it go oval. On
+               the default "fit to content" sizing, .logo-wrap's height has
+               nothing definite to resolve max-height against, so this has
+               no effect there either - the logo just uses the width-based
+               size like it always has. */
+            width: 35%;
             min-width: 40px;
+            max-width: 120px;
             height: auto;
+            max-height: 100%;
             aspect-ratio: 1 / 1;
             display: block;
             /* transform (not width/height) is what's animated, so the bounce
