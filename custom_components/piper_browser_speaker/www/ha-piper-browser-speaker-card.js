@@ -59,8 +59,24 @@
 
   // Labels for the playback state shown alongside the connection status
   // (e.g. "Connected (Playing)") - mirrors the state strings this card
-  // already reports to the backend via _reportState.
-  const PLAYBACK_LABELS = { idle: "Idle", playing: "Playing", paused: "Paused" };
+  // already reports to the backend via _reportState, plus "announcing"
+  // (see the announce-channel listeners below) which is local-display-only
+  // and never sent to the backend.
+  const PLAYBACK_LABELS = { idle: "Idle", playing: "Playing", paused: "Paused", announcing: "Announcing" };
+
+  // Anchor corners available for the "device name row" and "status text"
+  // segments' optional custom positioning - an empty anchor means "leave it
+  // in the card's normal top-to-bottom layout" (the existing/default
+  // behavior), any other value pins that segment via position: absolute at
+  // a fixed pixel offset from that corner, same idea as the logo's own
+  // fixed right-edge pinning above.
+  const SEGMENT_ANCHOR_OPTIONS = [
+    { value: "", label: "Default (normal layout)" },
+    { value: "top-left", label: "Top-left corner" },
+    { value: "top-right", label: "Top-right corner" },
+    { value: "bottom-left", label: "Bottom-left corner" },
+    { value: "bottom-right", label: "Bottom-right corner" },
+  ];
 
   class HaPiperBrowserSpeakerCard extends HTMLElement {
     setConfig(config) {
@@ -144,6 +160,23 @@
       this._logoRightOffset = Number.isFinite(logoRightOffset) && logoRightOffset >= 0 ? logoRightOffset : LOGO_RIGHT_OFFSET_DEFAULT;
       this._applyLogoLayout();
       if (this._card) this._applyLogoVisibility(this._card.getBoundingClientRect().width);
+
+      // Optional custom positioning for the device-name row and the status
+      // text, same fixed-pixel-anchor idea as the logo above - left on
+      // "Default", each stays exactly where it's always been (normal
+      // top-to-bottom flex flow), so this is fully opt-in.
+      this._applySegmentPosition(
+        this._row,
+        this._config.row_anchor,
+        Number(this._config.row_offset_x) || 0,
+        Number(this._config.row_offset_y) || 0
+      );
+      this._applySegmentPosition(
+        this._statusEl,
+        this._config.status_anchor,
+        Number(this._config.status_offset_x) || 0,
+        Number(this._config.status_offset_y) || 0
+      );
 
       const entityId = this._config.entity;
       const stateObj = this._hass ? this._hass.states[entityId] : undefined;
@@ -305,6 +338,20 @@
             flex-direction: column;
           }
           .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex: 0 0 auto; }
+          /* Applied by _applySegmentPosition() when the editor's row/status
+             "position" is set to something other than "Default" - top/
+             right/bottom/left are then set inline per-instance to whichever
+             corner + pixel offset was chosen, same fixed-pixel-pin idea as
+             .logo-wrap. Being position: absolute takes it out of .content's
+             flex flow automatically (no other CSS change needed), which
+             also means a positioned segment stops contributing to the
+             card's natural/auto height - expected trade-off, only applies
+             once a segment is actually moved out of the default layout. */
+          .row.positioned, .status.positioned {
+            position: absolute;
+            margin: 0;
+            white-space: nowrap;
+          }
           .dot {
             width: 10px; height: 10px; border-radius: 50%;
             background: var(--disabled-text-color, #bdbdbd); flex-shrink: 0;
@@ -407,6 +454,8 @@
       this._card = shadow.querySelector("ha-card");
       this._content = shadow.querySelector(".content");
       this._logoWrap = shadow.querySelector(".logo-wrap");
+      this._row = shadow.querySelector(".row");
+      this._statusEl = shadow.getElementById("status");
       this._setupLogoSizeObserver();
       // Announcements play on their own audio channel (not in the DOM - a
       // plain Audio() object plays fine detached) so they never touch the
@@ -437,13 +486,32 @@
           : "";
         this._reportState({ media_title: this._mediaTitle || "" });
       });
-      // The announcement channel isn't wired into _reportState (announcements
-      // are a brief duck-and-resume, not the entity's own playback state) but
-      // the grille should still bounce along with whatever's actually making
-      // sound, announcement included.
-      this._announceAudio.addEventListener("play", () => this._setPlayingVisual(true));
-      this._announceAudio.addEventListener("pause", () => this._setPlayingVisual(false));
-      this._announceAudio.addEventListener("ended", () => this._setPlayingVisual(false));
+      // The announcement channel still isn't wired into _reportState
+      // (announcements are a brief duck-and-resume, not the entity's own
+      // playback state, so the backend entity state shouldn't change) - but
+      // it now does update the on-card status TEXT to "Announcing" locally
+      // (nothing sent to the backend), alongside the grille bounce it
+      // already drove. This was the actual cause of "image bounces but no
+      // text status change": a TTS/announcement plays on this separate
+      // _announceAudio channel, which _setPlayingVisual (the bounce) always
+      // watched, but _renderStatus's "Connected (Playing/Idle/Paused)" text
+      // was only ever updated from the MAIN track's play/pause/ended events
+      // via _reportState - an announcement never touched it at all.
+      this._announceAudio.addEventListener("play", () => {
+        this._isAnnouncing = true;
+        this._setPlayingVisual(true);
+        this._renderStatus();
+      });
+      this._announceAudio.addEventListener("pause", () => {
+        this._isAnnouncing = false;
+        this._setPlayingVisual(false);
+        this._renderStatus();
+      });
+      this._announceAudio.addEventListener("ended", () => {
+        this._isAnnouncing = false;
+        this._setPlayingVisual(false);
+        this._renderStatus();
+      });
       shadow.getElementById("unlock-btn").addEventListener("click", () => this._unlockAudio());
     }
 
@@ -486,6 +554,24 @@
       const logoWidth = this._logoWidth || LOGO_WIDTH_DEFAULT;
       const logoRightOffset = this._logoRightOffset || LOGO_RIGHT_OFFSET_DEFAULT;
       this._content.style.paddingRight = hideLogo ? "0px" : `${logoWidth + logoRightOffset + 12}px`;
+    }
+
+    // Pins a segment (the device-name row, or the status text) to a fixed
+    // corner + pixel offset, or clears that and lets it sit back in the
+    // card's normal top-to-bottom flow when anchor is empty/falsy. Same
+    // pattern as _applyLogoLayout, generalized to any element.
+    _applySegmentPosition(el, anchor, offsetX, offsetY) {
+      if (!el) return;
+      const positioned = !!anchor;
+      el.classList.toggle("positioned", positioned);
+      el.style.top = "";
+      el.style.right = "";
+      el.style.bottom = "";
+      el.style.left = "";
+      if (!positioned) return;
+      const [vSide, hSide] = anchor.split("-");
+      el.style[vSide] = `${offsetY}px`;
+      el.style[hSide] = `${offsetX}px`;
     }
 
     // Bounces the logo while either audio channel is actually playing. Checked
@@ -568,7 +654,13 @@
       if (!status) return;
       const kind = this._connectionKind || "disconnected";
       if (kind === "connected") {
-        const playbackLabel = PLAYBACK_LABELS[this._playbackState] || PLAYBACK_LABELS.idle;
+        // An in-progress announcement takes priority over the main track's
+        // last-known state - the main track is likely paused for the
+        // duck-and-resume right now, so showing "Announcing" is more
+        // accurate than "Paused" until the announcement finishes.
+        const playbackLabel = this._isAnnouncing
+          ? PLAYBACK_LABELS.announcing
+          : PLAYBACK_LABELS[this._playbackState] || PLAYBACK_LABELS.idle;
         status.textContent = `Connected (${playbackLabel})`;
         return;
       }
@@ -632,69 +724,184 @@
       this._picker.hass = this._hass;
       this._picker.value = this._config.entity || "";
 
-      // Plain number inputs (not a custom ha-* component - keeps this
-      // simple and avoids any lazy-custom-element-upgrade timing gotchas)
-      // for the logo's fixed size/position and the hide-below-this-width
-      // threshold, described in the design-reset comment near
-      // LOGO_HIDE_WIDTH_DEFAULT at the top of the file. Left blank, the
-      // card falls back to the *_DEFAULT constants - only set here when
-      // those need adjusting for a particular dashboard.
-      if (!this._logoSizingWrap) {
-        this._logoSizingWrap = document.createElement("div");
-        this._logoSizingWrap.style.cssText =
-          "display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;";
+      // Builds the three collapsible "Logo" / "Device name row" / "Status
+      // text" position sections the first time only - see _makeSection,
+      // _makeNumberField, _makeSelectField below. Every field created here
+      // is pushed onto this._fields so _syncFieldValues() (called
+      // unconditionally below, EVERY render, not just this first one) can
+      // re-stamp each field's displayed value from the actual saved config.
+      //
+      // That unconditional re-sync is the fix for "the editor boxes don't
+      // keep user inputted data": these fields used to only have their
+      // `.value = ...` line set once, right here inside this creation
+      // guard, so re-opening the editor (a fresh _render() call on the same
+      // element, config already populated) never updated what the inputs
+      // displayed - they kept showing empty/placeholder even though the
+      // YAML view proved the real values were saved correctly all along.
+      // The entity picker above never had this bug because its own
+      // `this._picker.value = ...` line already sits outside any such
+      // guard; every field below now follows that same pattern.
+      if (!this._sectionsWrap) {
+        this._fields = [];
+        this._sectionsWrap = document.createElement("div");
+        this.shadowRoot.querySelector(".wrap").appendChild(this._sectionsWrap);
 
-        const makeField = (labelText, key, defaultValue) => {
-          const label = document.createElement("label");
-          label.style.cssText =
-            "display:flex; flex-direction:column; gap:4px; font-size:0.85em; flex:1; min-width:170px; color: var(--secondary-text-color);";
-          const span = document.createElement("span");
-          span.textContent = labelText;
-          const input = document.createElement("input");
-          input.type = "number";
-          input.min = "0";
-          input.placeholder = String(defaultValue);
-          input.style.cssText =
-            "padding:8px; border-radius:4px; border:1px solid var(--divider-color, #ccc); background: var(--card-background-color, transparent); color: inherit; font: inherit;";
-          input.value = this._config[key] != null ? this._config[key] : "";
-          input.addEventListener("change", () => {
-            const raw = input.value.trim();
-            const next = { ...this._config };
-            if (raw === "") {
-              delete next[key];
-            } else {
-              next[key] = Number(raw);
-            }
-            this._config = next;
-            this._fireChanged();
-          });
-          label.appendChild(span);
-          label.appendChild(input);
-          return { label, input };
-        };
+        const logoFieldsWrap = document.createElement("div");
+        logoFieldsWrap.style.cssText = "display:flex; gap:12px; flex-wrap:wrap;";
+        logoFieldsWrap.appendChild(
+          this._makeNumberField("Hide logo below card width (px)", "logo_hide_width", LOGO_HIDE_WIDTH_DEFAULT).label
+        );
+        logoFieldsWrap.appendChild(
+          this._makeNumberField("Logo width (px)", "logo_width", LOGO_WIDTH_DEFAULT).label
+        );
+        logoFieldsWrap.appendChild(
+          this._makeNumberField("Logo height (px)", "logo_height", LOGO_HEIGHT_DEFAULT).label
+        );
+        logoFieldsWrap.appendChild(
+          this._makeNumberField("Logo distance from right edge (px)", "logo_right_offset", LOGO_RIGHT_OFFSET_DEFAULT)
+            .label
+        );
+        this._sectionsWrap.appendChild(this._makeSection("Logo position & size", logoFieldsWrap));
 
-        const hideField = makeField(
-          "Hide logo below card width (px)",
-          "logo_hide_width",
-          LOGO_HIDE_WIDTH_DEFAULT
+        this._sectionsWrap.appendChild(
+          this._makeSection("Device name row position", this._makeSegmentPositionFields("row"))
         );
-        const widthField = makeField("Logo width (px)", "logo_width", LOGO_WIDTH_DEFAULT);
-        const heightField = makeField("Logo height (px)", "logo_height", LOGO_HEIGHT_DEFAULT);
-        const rightField = makeField(
-          "Logo distance from right edge (px)",
-          "logo_right_offset",
-          LOGO_RIGHT_OFFSET_DEFAULT
+        this._sectionsWrap.appendChild(
+          this._makeSection("Status text position", this._makeSegmentPositionFields("status"))
         );
-        this._logoHideInput = hideField.input;
-        this._logoWidthInput = widthField.input;
-        this._logoHeightInput = heightField.input;
-        this._logoRightInput = rightField.input;
-        this._logoSizingWrap.appendChild(hideField.label);
-        this._logoSizingWrap.appendChild(widthField.label);
-        this._logoSizingWrap.appendChild(heightField.label);
-        this._logoSizingWrap.appendChild(rightField.label);
-        this.shadowRoot.querySelector(".wrap").appendChild(this._logoSizingWrap);
       }
+
+      this._syncFieldValues();
+    }
+
+    // A labeled plain <input type="number"> (not a custom ha-* component -
+    // avoids any lazy-custom-element-upgrade timing gotchas). Tracked in
+    // this._fields so _syncFieldValues() can re-stamp its value every
+    // render, not just at creation.
+    _makeNumberField(labelText, key, defaultValue) {
+      const label = document.createElement("label");
+      label.style.cssText =
+        "display:flex; flex-direction:column; gap:4px; font-size:0.85em; flex:1; min-width:170px; color: var(--secondary-text-color);";
+      const span = document.createElement("span");
+      span.textContent = labelText;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.placeholder = String(defaultValue);
+      input.style.cssText =
+        "padding:8px; border-radius:4px; border:1px solid var(--divider-color, #ccc); background: var(--card-background-color, transparent); color: inherit; font: inherit;";
+      input.addEventListener("change", () => {
+        const raw = input.value.trim();
+        const next = { ...this._config };
+        if (raw === "") {
+          delete next[key];
+        } else {
+          next[key] = Number(raw);
+        }
+        this._config = next;
+        this._fireChanged();
+      });
+      label.appendChild(span);
+      label.appendChild(input);
+      this._fields.push({ el: input, key, kind: "number" });
+      return { label, input };
+    }
+
+    // A labeled <select> - same re-sync tracking as _makeNumberField.
+    _makeSelectField(labelText, key, options) {
+      const label = document.createElement("label");
+      label.style.cssText =
+        "display:flex; flex-direction:column; gap:4px; font-size:0.85em; flex:1; min-width:170px; color: var(--secondary-text-color);";
+      const span = document.createElement("span");
+      span.textContent = labelText;
+      const select = document.createElement("select");
+      select.style.cssText =
+        "padding:8px; border-radius:4px; border:1px solid var(--divider-color, #ccc); background: var(--card-background-color, transparent); color: inherit; font: inherit;";
+      options.forEach((opt) => {
+        const optionEl = document.createElement("option");
+        optionEl.value = opt.value;
+        optionEl.textContent = opt.label;
+        select.appendChild(optionEl);
+      });
+      select.addEventListener("change", () => {
+        const next = { ...this._config };
+        if (select.value === "") {
+          delete next[key];
+        } else {
+          next[key] = select.value;
+        }
+        this._config = next;
+        this._fireChanged();
+      });
+      label.appendChild(span);
+      label.appendChild(select);
+      this._fields.push({ el: select, key, kind: "select" });
+      return { label, select };
+    }
+
+    // The anchor dropdown + x/y offset fields shared by the row and status
+    // segments - `prefix` is "row" or "status", matching the card's own
+    // row_anchor/row_offset_x/row_offset_y (and status_* equivalents) config
+    // keys read in _updateFromConfig().
+    _makeSegmentPositionFields(prefix) {
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "display:flex; gap:12px; flex-wrap:wrap;";
+      wrap.appendChild(
+        this._makeSelectField("Position", `${prefix}_anchor`, SEGMENT_ANCHOR_OPTIONS).label
+      );
+      wrap.appendChild(this._makeNumberField("Offset from edge, horizontal (px)", `${prefix}_offset_x`, 0).label);
+      wrap.appendChild(this._makeNumberField("Offset from edge, vertical (px)", `${prefix}_offset_y`, 0).label);
+      const hint = document.createElement("div");
+      hint.style.cssText = "font-size:0.8em; color: var(--secondary-text-color); margin-top:4px; width:100%;";
+      hint.textContent =
+        'Leave "Default" to keep this where it normally sits in the card. Pick a corner to pin it there instead.';
+      wrap.appendChild(hint);
+      return wrap;
+    }
+
+    // A collapsible group - collapsed by default so the editor doesn't open
+    // with every position/size field already expanded. The uid/collapsed
+    // state lives only on this editor element instance (this._expandedSections,
+    // a Set of section titles) and is never written to the card config -
+    // toggling it just flips this one section's own display and chevron,
+    // it never calls _fireChanged().
+    _makeSection(titleText, contentEl) {
+      this._expandedSections = this._expandedSections || new Set();
+      const section = document.createElement("div");
+      section.style.cssText =
+        "border:1px solid var(--divider-color, #ccc); border-radius:8px; margin-top:12px; overflow:hidden;";
+      const header = document.createElement("button");
+      header.type = "button";
+      const expanded = this._expandedSections.has(titleText);
+      header.textContent = `${expanded ? "▾" : "▸"} ${titleText}`;
+      header.style.cssText =
+        "display:block; width:100%; text-align:left; padding:10px 12px; border:none; background: var(--card-background-color, transparent); color: inherit; font: inherit; font-weight:500; cursor:pointer;";
+      contentEl.style.padding = "0 12px 12px 12px";
+      contentEl.style.display = expanded ? "block" : "none";
+      header.addEventListener("click", () => {
+        const nowExpanded = contentEl.style.display !== "none";
+        contentEl.style.display = nowExpanded ? "none" : "block";
+        header.textContent = `${nowExpanded ? "▸" : "▾"} ${titleText}`;
+        if (nowExpanded) {
+          this._expandedSections.delete(titleText);
+        } else {
+          this._expandedSections.add(titleText);
+        }
+      });
+      section.appendChild(header);
+      section.appendChild(contentEl);
+      return section;
+    }
+
+    // Re-stamps every tracked field's displayed value from this._config -
+    // called unconditionally on every _render(), so reopening the editor
+    // (or any config-changed round-trip re-rendering this same element)
+    // always shows what's actually saved, not stale placeholders.
+    _syncFieldValues() {
+      if (!this._fields) return;
+      this._fields.forEach(({ el, key }) => {
+        el.value = this._config[key] != null ? this._config[key] : "";
+      });
     }
 
     _fireChanged() {
