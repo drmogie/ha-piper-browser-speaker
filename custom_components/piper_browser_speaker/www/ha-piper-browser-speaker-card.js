@@ -990,12 +990,28 @@
     }
 
     // Re-stamps every tracked field's displayed value from this._config -
-    // called unconditionally on every _render(), so reopening the editor
-    // (or any config-changed round-trip re-rendering this same element)
-    // always shows what's actually saved, not stale placeholders.
+    // called on every _render(), so reopening the editor (or any
+    // config-changed round-trip re-rendering this same element) always
+    // shows what's actually saved, not stale placeholders (the .16.8 fix).
+    //
+    // 2026.09.16.11: `hass` gets reassigned on this editor on EVERY entity
+    // state change anywhere in the system (not just ones relevant to this
+    // card), and the `hass` setter below calls `_render()` every time - so
+    // on a live HA instance this can fire many times a second. Overwriting
+    // every field's `.value` unconditionally each time meant a field you
+    // were actively typing into got reset back to its last COMMITTED value
+    // (the `change` event, which actually updates `this._config`, only
+    // fires on blur/Enter - not per keystroke) before you could finish
+    // typing, which is what made a number field seem to randomly reset or
+    // "eat" digits mid-edit. Skip re-stamping whichever field currently has
+    // focus in this editor's own shadow root - every other field still
+    // stays in sync, and the focused one catches up the moment it's
+    // committed and this method next runs.
     _syncFieldValues() {
       if (!this._fields) return;
+      const focused = this.shadowRoot && this.shadowRoot.activeElement;
       this._fields.forEach(({ el, key }) => {
+        if (el === focused) return;
         el.value = this._config[key] != null ? this._config[key] : "";
       });
     }

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026.09.16.11
+- Fixed the card editor's number fields (logo size/position, row position, status position) resetting or "eating" digits while you were actively typing into them - a regression from `.16.8`'s fix for fields not showing saved values on reopen. That fix re-stamped every field's displayed value on every editor render, but the editor re-renders every time Home Assistant pushes any entity state update (which can be many times a second) - so a field you were mid-typing into kept getting reset back to its last saved value before you could finish. Fields now skip re-stamping while they're the one you're actively focused on/typing in; everything else still stays in sync as before.
+
 ## 2026.09.16.10
 - Moved the card's logo out of the JS file itself and into a real static file (`piper-logo.webp`, served alongside the card's own `.js`) instead of an embedded ~32KB base64 image. This shrinks the card's own file from ~79KB to ~47KB (about 40% smaller). The card's JS is the one file that has to finish downloading and running before Home Assistant can actually create the card - on a dashboard loading a lot of custom cards at once, that's some of what occasionally causes a "Configuration error" ("custom element doesn't exist") right after a page load, because the browser's own import of this file loses a timing race. This doesn't eliminate that race (it's ultimately Home Assistant's own dynamic-import scheduling, outside this card's control), but a meaningfully smaller/faster file should make it noticeably less likely to happen. No visual change - the logo looks and behaves exactly the same, it's just no longer baked into the script.
 
