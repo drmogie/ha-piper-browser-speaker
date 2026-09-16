@@ -210,9 +210,19 @@
       shadow.innerHTML = `
         <style>
           ha-card { padding: 16px; }
-          .logo-wrap { display: flex; justify-content: center; margin-bottom: 8px; }
+          .logo-wrap { display: flex; justify-content: center; margin: 4px 0 8px; }
           .logo {
-            width: 64px; height: 64px; display: block;
+            /* Percentage width (of the card's own content box) plus a cap,
+               rather than a fixed pixel size, so the logo scales up or down
+               with the card itself - e.g. a narrower column in a Sections
+               layout, or the card resized wider - instead of staying a fixed
+               size no matter how much room the card actually has. */
+            width: 35%;
+            min-width: 40px;
+            max-width: 120px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            display: block;
             /* transform (not width/height) is what's animated, so the bounce
                stays smooth (GPU-composited) instead of re-laying-out the card. */
             transition: transform 0.15s ease-out;
@@ -248,12 +258,12 @@
           }
         </style>
         <ha-card>
-          <div class="logo-wrap">
-            <img class="logo" id="logo" src="${LOGO_DATA_URI}" alt="" />
-          </div>
           <div class="row">
             <span class="dot" id="dot"></span>
             <span class="title" id="title"></span>
+          </div>
+          <div class="logo-wrap">
+            <img class="logo" id="logo" src="${LOGO_DATA_URI}" alt="" />
           </div>
           <div class="status" id="status">Select an entity in the card editor</div>
           <div class="audio-lock" id="audio-lock" hidden>

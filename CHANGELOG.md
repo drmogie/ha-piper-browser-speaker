@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026.09.16.2
+- Reordered the card layout: the status dot + device name are now at the top, the logo sits below that (centered), and the connection status text is below the logo.
+- The logo now scales with the card's own size (a percentage width with sensible min/max caps) instead of staying a fixed pixel size regardless of how wide or narrow the card is.
+- Fixed a real backend bug: setting up a **second** Piper Browser Speaker device on the same Home Assistant instance could fail outright with a "setup_error" (its entity would then sit permanently `unavailable`, no card could ever connect to it). Home Assistant sets up multiple config entries for the same integration concurrently, and the check the integration used to decide whether it had already registered the card's frontend resources wasn't safe against two entries doing that check at the same moment - both could see "not registered yet" and try to register the same route, and the second one crashed. That check is now wrapped in a lock so only one entry actually performs the registration, however many speakers are configured. Needs a full Home Assistant restart to take effect (this is backend code, not just the card) - existing devices that already hit this are expected to set up successfully on that restart.
+
 ## 2026.09.16.1
 - The card now shows the Piper Browser Speaker logo (a small, resized copy embedded directly in the card - no extra file to load) instead of just a status dot and title.
 - Removed the native audio scrubber/play-bar - playback is still handled by the same `<audio>` element, it's just no longer shown, since the entity's own controls (Developer Tools, a media control card, voice commands, etc.) are what actually start/stop it.
