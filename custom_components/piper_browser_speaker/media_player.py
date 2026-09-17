@@ -73,6 +73,15 @@ class PiperBrowserSpeaker(MediaPlayerEntity):
         self._attr_volume_level = 1.0
         self._attr_is_volume_muted = False
         self._attr_media_title = None
+        # Whether the browser card's separate announce/TTS audio channel is
+        # currently playing - see the long comment on async_play_media()
+        # about why announcements deliberately don't touch _attr_state
+        # itself. Exposed as its own extra_state_attribute instead, so a
+        # consumer that specifically needs to know "is a TTS announcement
+        # playing right now" (e.g. a card timing chunked TTS playback) has
+        # a real, precise, event-driven signal to read - without changing
+        # what this entity's main reported state means for anyone else.
+        self._attr_is_announcing = False
 
     async def async_added_to_hass(self) -> None:
         """Wire up dispatcher listeners for state + connection updates."""
@@ -99,6 +108,8 @@ class PiperBrowserSpeaker(MediaPlayerEntity):
             self._attr_is_volume_muted = state["is_volume_muted"]
         if "media_title" in state:
             self._attr_media_title = state["media_title"]
+        if "is_announcing" in state:
+            self._attr_is_announcing = bool(state["is_announcing"])
         self._attr_available = True
         self.async_write_ha_state()
 
@@ -107,7 +118,12 @@ class PiperBrowserSpeaker(MediaPlayerEntity):
         self._attr_available = connected
         if not connected:
             self._attr_state = MediaPlayerState.IDLE
+            self._attr_is_announcing = False
         self.async_write_ha_state()
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"is_announcing": self._attr_is_announcing}
 
     def _send_command(self, command: dict) -> None:
         async_dispatcher_send(self.hass, SIGNAL_COMMAND.format(self.entity_id), command)

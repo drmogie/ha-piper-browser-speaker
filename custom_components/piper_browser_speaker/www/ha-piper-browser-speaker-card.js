@@ -70,10 +70,11 @@
   const LOGO_RIGHT_OFFSET_DEFAULT = 50;
 
   // Labels for the playback state shown alongside the connection status
-  // (e.g. "Connected (Playing)") - mirrors the state strings this card
-  // already reports to the backend via _reportState, plus "announcing"
-  // (see the announce-channel listeners below) which is local-display-only
-  // and never sent to the backend.
+  // (e.g. "Connected (Playing)") - "announcing" is local display state only
+  // (this._isAnnouncing), separate from the `is_announcing` extra attribute
+  // now also reported to the backend (see the announce-channel listeners
+  // below) - the label here is purely about what this card shows, not
+  // about what's sent to HA.
   const PLAYBACK_LABELS = { idle: "Idle", playing: "Playing", paused: "Paused", announcing: "Announcing" };
 
   // Anchor corners available for the "device name row" and "status text"
@@ -541,31 +542,35 @@
           : "";
         this._reportState({ media_title: this._mediaTitle || "" });
       });
-      // The announcement channel still isn't wired into _reportState
-      // (announcements are a brief duck-and-resume, not the entity's own
-      // playback state, so the backend entity state shouldn't change) - but
-      // it now does update the on-card status TEXT to "Announcing" locally
-      // (nothing sent to the backend), alongside the grille bounce it
-      // already drove. This was the actual cause of "image bounces but no
-      // text status change": a TTS/announcement plays on this separate
-      // _announceAudio channel, which _setPlayingVisual (the bounce) always
-      // watched, but _renderStatus's "Connected (Playing/Idle/Paused)" text
-      // was only ever updated from the MAIN track's play/pause/ended events
-      // via _reportState - an announcement never touched it at all.
+      // The announcement channel deliberately never touches the entity's
+      // main reported `state` (announcements are a brief duck-and-resume,
+      // not the entity's own playback state - see async_play_media's
+      // comment on the backend side) - that's still true. But a consumer
+      // that specifically needs to know "is a TTS/announcement actually
+      // playing right now" (e.g. a card timing chunked TTS playback one
+      // message at a time) had no real signal to read at all: the main
+      // `state` never reflects an announcement, so polling it is blind to
+      // whether one is even happening. `is_announcing` is a separate,
+      // additive field sent alongside (never replacing) `state`, exposed
+      // by the entity as its own extra_state_attribute - it doesn't change
+      // what `state` means for anything else watching this entity.
       this._announceAudio.addEventListener("play", () => {
         this._isAnnouncing = true;
         this._setPlayingVisual(true);
         this._renderStatus();
+        this._reportState({ is_announcing: true });
       });
       this._announceAudio.addEventListener("pause", () => {
         this._isAnnouncing = false;
         this._setPlayingVisual(false);
         this._renderStatus();
+        this._reportState({ is_announcing: false });
       });
       this._announceAudio.addEventListener("ended", () => {
         this._isAnnouncing = false;
         this._setPlayingVisual(false);
         this._renderStatus();
+        this._reportState({ is_announcing: false });
       });
       shadow.getElementById("unlock-btn").addEventListener("click", () => this._unlockAudio());
     }
