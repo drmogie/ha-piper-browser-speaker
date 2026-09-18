@@ -12,7 +12,7 @@ CARD_FILENAME = "ha-piper-browser-speaker-card.js"
 # own separate static-path registration.
 STATIC_URL_ROOT = f"/{DOMAIN}"
 CARD_URL = f"{STATIC_URL_ROOT}/{CARD_FILENAME}"
-CARD_VERSION = "2026.09.16.11"
+CARD_VERSION = "2026.09.18.01"
 
 SIGNAL_COMMAND = f"{DOMAIN}_command_{{}}"
 SIGNAL_STATE = f"{DOMAIN}_state_{{}}"

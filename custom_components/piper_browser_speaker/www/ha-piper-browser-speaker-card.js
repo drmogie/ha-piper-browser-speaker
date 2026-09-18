@@ -17,6 +17,13 @@
   const CARD_TAG = "ha-piper-browser-speaker-card";
   const EDITOR_TAG = "ha-piper-browser-speaker-card-editor";
   const PLATFORM = "piper_browser_speaker";
+  // Shown as small print at the bottom of the GUI editor only (never on the
+  // card itself) so Mogie can tell at a glance which build is actually
+  // loaded in the browser, without opening the YAML view or DevTools. Bump
+  // this alongside manifest.json/const.py's CARD_VERSION on every release -
+  // there's no automated single-source-of-truth for it across the Python
+  // and JS sides of this integration.
+  const CARD_VERSION = "2026.09.18.01";
   const WS_SUBSCRIBE = "piper_browser_speaker/subscribe";
   const WS_REPORT_STATE = "piper_browser_speaker/report_state";
   // The card's own small speaker-grille logo. Served as a real static file
@@ -855,6 +862,18 @@
             )
           )
         );
+      }
+
+      // Small-print version footer, bottom center of the editor GUI only
+      // (never shown on the card itself) - static text, created once like
+      // _sectionsWrap above, not part of _syncFieldValues() since it isn't a
+      // config-backed field.
+      if (!this._versionFooter) {
+        this._versionFooter = document.createElement("div");
+        this._versionFooter.style.cssText =
+          "text-align:center; font-size:0.7em; color: var(--secondary-text-color); opacity:0.6; margin-top:12px;";
+        this._versionFooter.textContent = `v${CARD_VERSION}`;
+        this.shadowRoot.querySelector(".wrap").appendChild(this._versionFooter);
       }
 
       this._syncFieldValues();

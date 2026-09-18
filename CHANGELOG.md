@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.09.18.01
+- Added a small version number in the bottom center of the card's GUI editor (in small, low-contrast print, below the position sections) so you can tell at a glance which build is actually loaded without opening the YAML view.
+- Version numbers now pad the release counter to two digits (`.01`, `.02`, ... `.10`, `.11`) instead of one - a single-digit counter sorts wrong as plain text once you pass 9 (`"10"` sorts before `"2"`), which can confuse HACS's own version comparison. This is a repo-wide convention change, not a card behavior change.
+
 ## 2026.09.17.1
 - Added a new `is_announcing` attribute to the entity, reported precisely and immediately from the announce/TTS audio channel's own `play`/`pause`/`ended` events - the same reliable pattern already used for the main channel. This entity's main `state` deliberately never changes for a TTS announcement (a brief duck-and-resume shouldn't disturb the "real" playback state anything else is watching, e.g. paused music), which has been true and stays true - but that also meant nothing watching this entity had ANY way to tell whether an announcement was actually in progress. That turned out to be the real cause of a long-running chunk-cutoff bug in [Text to Speech Card](https://github.com/drmogie/ha-text-to-speech-card): it was polling `state` to time chunked playback, but every `tts.speak` call routes through this announce channel, so `state` was never informative about it in the first place - every fix there was really just tuning a guess against a signal that was blind to the thing it was trying to measure. `is_announcing` gives a real, immediate answer instead.
 
